@@ -1,0 +1,12 @@
+[Unit]
+Description=Announce Gauc Instance @%i service
+BindsTo=gauc@%i.service
+
+[Service]
+EnvironmentFile=/etc/environment
+
+ExecStart=/bin/sh -c "while true; do etcdctl set /discovery/services/gauc@%i ${COREOS_PRIVATE_IPV4}:5000 --ttl 60; sleep 45; done"
+ExecStop=/usr/bin/etcdctl rm /discovery/services/couchbase%i
+
+[X-Fleet]
+X-ConditionMachineOf=gauc@%i.service
