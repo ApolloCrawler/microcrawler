@@ -6,6 +6,8 @@ Requires=docker.service
 After=couchbase@%i.service
 
 [Service]
+EnvironmentFile=/etc/environment
+
 TimeoutStartSec=0
 ExecStartPre=-/usr/bin/docker kill gauc
 ExecStartPre=-/usr/bin/docker rm gauc
