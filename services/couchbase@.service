@@ -8,7 +8,7 @@ TimeoutStartSec=0
 ExecStartPre=-/usr/bin/docker kill couchbase
 ExecStartPre=-/usr/bin/docker rm couchbase
 ExecStartPre=/usr/bin/docker pull korczis/couchbase:4.5.1
-ExecStart=/usr/bin/docker run --name couchbase -p 8091:8091 -p 8092:8092 -p 8093:8093 -p 8094:8094 -p 11207:11207 -p 11210:11210 -p 11211:11211 -p 18091:18091 -p 18092:18092 -p 18093:18093 korczis/couchbase:4.5.1
+ExecStart=/usr/bin/docker run --name couchbase -v /data/couchbase:/opt/couchbase/var/lib/couchbase/data -p 8091:8091 -p 8092:8092 -p 8093:8093 -p 8094:8094 -p 11207:11207 -p 11210:11210 -p 11211:11211 -p 18091:18091 -p 18092:18092 -p 18093:18093 korczis/couchbase:4.5.1
 ExecStop=/usr/bin/docker stop couchbase
 
 [X-Fleet]
