@@ -26,7 +26,7 @@ EnvironmentFile=/etc/environment
 ExecStartPre=-/usr/bin/docker kill elasticsearch
 ExecStartPre=-/usr/bin/docker rm elasticsearch
 ExecStartPre=/usr/bin/docker pull korczis/elasticsearch:5.2.1-couchbase
-ExecStart=/usr/bin/docker run --name elasticsearch -p 9091:9091 -p 9200:9200 -p 9300:9300 korczis/elasticsearch:5.2.1-couchbase
+ExecStart=/usr/bin/docker run --name elasticsearch -v /data/elasticsearch:/usr/share/elasticsearch -p 9091:9091 -p 9200:9200 -p 9300:9300 korczis/elasticsearch:5.2.1-couchbase
 
 # Stop
 ExecStop=/usr/bin/docker stop elasticsearch
