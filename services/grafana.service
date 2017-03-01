@@ -1,0 +1,30 @@
+[Unit]
+Description=grafana
+
+After=docker.service
+After=heapster-influxdb.service
+
+Requires=docker.service
+Requires=heapster-influxdb.service
+
+[Service]
+EnvironmentFile=/etc/environment
+
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove
+# work correctly.
+KillMode=none
+
+ExecStartPre=-/usr/bin/docker kill grafana
+ExecStartPre=-/usr/bin/docker rm grafana
+ExecStart=/usr/bin/docker run --name=grafana --link influxdb:influxdb -p 80:8080 -e INFLUXDB_HOST=influxdb kubernetes/heapster_grafana:v0.7
+
+Restart=always
+RestartSec=5
+
+# Stop
+ExecStop=/usr/bin/docker stop grafana
+
+[X-Fleet]
+X-ConditionMachineOf=heapster-influxdb.service

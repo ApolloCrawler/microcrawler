@@ -1,0 +1,12 @@
+[Unit]
+Description=Announce Couchbase Instance @%i service
+BindsTo=couchbase@%i.service
+
+[Service]
+EnvironmentFile=/etc/environment
+
+ExecStart=/bin/sh -c "while true; do etcdctl set /discovery/services/couchbase@%i ${COREOS_PRIVATE_IPV4}:8091 --ttl 60; sleep 45; done"
+ExecStop=/usr/bin/etcdctl rm /discovery/services/couchbase%i
+
+[X-Fleet]
+X-ConditionMachineOf=couchbase@%i.service

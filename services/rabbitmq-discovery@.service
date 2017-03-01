@@ -1,0 +1,12 @@
+[Unit]
+Description=Announce RabbitMQ Instance @%i service
+BindsTo=rabbitmq@%i.service
+
+[Service]
+EnvironmentFile=/etc/environment
+
+ExecStart=/bin/sh -c "while true; do etcdctl set /discovery/services/rabbitmq@%i ${COREOS_PRIVATE_IPV4}:5672 --ttl 60; sleep 45; done"
+ExecStop=/usr/bin/etcdctl rm /discovery/services/rabbitmq%i
+
+[X-Fleet]
+X-ConditionMachineOf=rabbitmq@%i.service

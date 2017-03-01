@@ -1,0 +1,36 @@
+[Unit]
+Description=Elasticsearch
+
+# Requirements
+Requires=etcd2.service
+Requires=docker.service
+Requires=elasticsearch-discovery@%i.service
+
+# Dependency ordering
+After=etcd2.service
+After=docker.service
+Before=elasticsearch-discovery@%i.service
+
+[Service]
+# Let processes take awhile to start up (for first run Docker containers)
+TimeoutStartSec=0
+
+# Change killmode from "control-group" to "none" to let Docker remove
+# work correctly.
+KillMode=none
+
+# Get CoreOS environmental variables
+EnvironmentFile=/etc/environment
+
+# Pre-start and Start
+ExecStartPre=-/usr/bin/docker kill elasticsearch
+ExecStartPre=-/usr/bin/docker rm elasticsearch
+ExecStartPre=/usr/bin/docker pull korczis/elasticsearch
+ExecStart=/usr/bin/docker run --name elasticsearch -p 9091:9091 -p 9200:9200 -p 9300:9300 korczis/elasticsearch:5.2.1-couchbase
+
+# Stop
+ExecStop=/usr/bin/docker stop elasticsearch
+
+[X-Fleet]
+# Don't schedule on the same machine as other Elasticsearch instances
+X-Conflicts=elasticsearch@*.service
