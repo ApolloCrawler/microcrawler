@@ -1,0 +1,23 @@
+[Unit]
+Description=MicrocrawlerWebapp
+After=docker.service
+Requires=docker.service
+
+After=couchbase@%i.service
+After=gauc@%i.service
+After=elasticsearch@%i.service
+After=rabbitmq@%i.service
+
+[Service]
+EnvironmentFile=/etc/environment
+
+TimeoutStartSec=0
+ExecStartPre=-/usr/bin/docker kill microcrawler-webapp
+ExecStartPre=-/usr/bin/docker rm microcrawler-webapp
+ExecStartPre=/usr/bin/docker pull korczis/microcrawler-webapp
+ExecStart=/usr/bin/docker run --name microcrawler-webapp -p 4000:4000 --env AMQP_HOSTNAME="${COREOS_PRIVATE_IPV4}" --env GAUC_URL="http://${COREOS_PRIVATE_IPV4}:5000" --env ELASTIC_URL="http://elastic:changeme@${COREOS_PRIVATE_IPV4}:9200" korczis/microcrawler-webapp
+ExecStop=/usr/bin/docker stop microcrawler-webapp
+
+[X-Fleet]
+# Don't schedule on the same machine as other Webapp instances
+X-Conflicts=microcrawler-webapp@*.service

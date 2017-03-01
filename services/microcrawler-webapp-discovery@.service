@@ -1,0 +1,12 @@
+[Unit]
+Description=Announce Microcrawler Webapp Instance @%i service
+BindsTo=microcrawler-webapp@%i.service
+
+[Service]
+EnvironmentFile=/etc/environment
+
+ExecStart=/bin/sh -c "while true; do etcdctl set /discovery/services/microcrawler-webapp@%i ${COREOS_PRIVATE_IPV4}:4000 --ttl 60; sleep 45; done"
+ExecStop=/usr/bin/etcdctl rm /discovery/services/microcrawler-webapp%i
+
+[X-Fleet]
+X-ConditionMachineOf=microcrawler-webapp@%i.service
