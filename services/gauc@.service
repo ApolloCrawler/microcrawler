@@ -10,7 +10,7 @@ TimeoutStartSec=0
 ExecStartPre=-/usr/bin/docker kill gauc
 ExecStartPre=-/usr/bin/docker rm gauc
 ExecStartPre=/usr/bin/docker pull korczis/gauc
-ExecStart=/usr/bin/docker run --name gauc -p 5000:5000 korczis/gauc -r -vvv
+ExecStart=/usr/bin/docker run --name gauc -p 5000:5000 korczis/gauc -r -vvv -u couchbase://${COREOS_PRIVATE_IPV4}/default
 ExecStop=/usr/bin/docker stop gauc
 
 [X-Fleet]
