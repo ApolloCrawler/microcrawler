@@ -12,8 +12,8 @@ TimeoutStartSec=0
 ExecStartPre=-/usr/bin/docker kill microcrawler-worker
 ExecStartPre=-/usr/bin/docker rm microcrawler-worker
 ExecStartPre=/usr/bin/docker pull korczis/microcrawler-worker
-ExecStartPre=mkdir -p /root/.microcrawler
-ExecStartPre=touch /root/.microcrawler/token.jwt
+ExecStartPre=-mkdir -p /root/.microcrawler
+ExecStartPre=-touch /root/.microcrawler/token.jwt
 ExecStart=/usr/bin/docker run --name microcrawler-worker korczis/microcrawler-worker --count 32 -u ws://${COREOS_PRIVATE_IPV4}:4000/worker -a  http://${COREOS_PRIVATE_IPV4}:4000/api/v1/auth/signin --username korczis@gmail.com --password jindrisska
 ExecStop=/usr/bin/docker stop microcrawler-worker
 
