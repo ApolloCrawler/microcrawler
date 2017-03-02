@@ -1,0 +1,20 @@
+[Unit]
+Description=MicrocrawlerWorker
+After=docker.service
+Requires=docker.service
+
+After=microcrawler-webapp@%i.service
+
+[Service]
+EnvironmentFile=/etc/environment
+
+TimeoutStartSec=0
+ExecStartPre=-/usr/bin/docker kill microcrawler-worker
+ExecStartPre=-/usr/bin/docker rm microcrawler-worker
+ExecStartPre=/usr/bin/docker pull korczis/microcrawler-worker
+ExecStart=/usr/bin/docker run --name microcrawler-worker korczis/microcrawler-worker --count 32 -u ws://${COREOS_PRIVATE_IPV4}:4000/worker -a  http://${COREOS_PRIVATE_IPV4}:4000/api/v1/auth/signin --username korczis@gmail.com --password jindrisska
+ExecStop=/usr/bin/docker stop microcrawler-worker
+
+[X-Fleet]
+# Don't schedule on the same machine as other Worker instances
+X-Conflicts=microcrawler-worker@*.service
