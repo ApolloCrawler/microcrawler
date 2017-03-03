@@ -15,7 +15,7 @@ TimeoutStartSec=0
 ExecStartPre=-/usr/bin/docker kill microcrawler-webapp
 ExecStartPre=-/usr/bin/docker rm microcrawler-webapp
 ExecStartPre=/usr/bin/docker pull korczis/microcrawler-webapp
-ExecStart=/usr/bin/docker run --name microcrawler-webapp -p 4000:4000 --env AMQP_HOSTNAME="${COREOS_PRIVATE_IPV4}" --env GAUC_URL="http://${COREOS_PRIVATE_IPV4}:5000" --env ELASTIC_URL="http://elastic:changeme@${COREOS_PRIVATE_IPV4}:9200" korczis/microcrawler-webapp
+ExecStart=/usr/bin/docker run --name microcrawler-webapp -p 4000:4000 --env AMQP_HOSTNAME="${COREOS_PRIVATE_IPV4}" --env GAUC_URL="http://${COREOS_PRIVATE_IPV4}:5000" --env ELASTIC_URL="http://elastic:changeme@${COREOS_PRIVATE_IPV4}:9200" korczis/microcrawler-webapp:0.0.2
 ExecStop=/usr/bin/docker stop microcrawler-webapp
 
 [X-Fleet]
