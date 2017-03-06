@@ -1,7 +1,34 @@
 # microcrawler
 
-## Create etcd host
+## Getting Started
 
-## Create master host
+### Clone this repository
 
-## Create worker host(s)
+```
+$ git clone https://github.com/ApolloCrawler/microcrawler.git
+```
+
+### Enter directory with sources
+
+```
+$ cd microcrawler
+```
+
+### Init submodules
+
+```
+$ git submodule init
+```
+
+## How To
+
+### Create etcd host
+
+### Create master host
+
+### Create worker host(s)
+
+
+## Note
+
+See [coreos/coreos-kubernetes](https://github.com/coreos/coreos-kubernetes)
