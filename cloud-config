@@ -1,0 +1,31 @@
+#cloud-config
+coreos:
+  update:
+    reboot-strategy: best-effort
+  etcd2:
+    advertise-client-urls: http://$private_ipv4:2379,http://$private_ipv4:4001
+    initial-advertise-peer-urls: http://$private_ipv4:2380
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
+    discovery: https://discovery.etcd.io/12a4eb4ce837a40c3bfbfd823c19bfdb
+  units:
+  - name: etcd2.service
+    command: start
+  - name: docker.service
+    drop-ins:
+    - name: 30-increase-ulimit.conf
+      content: |
+        [Service]
+        LimitMEMLOCK=infinity
+      command: restart
+ssh_authorized_keys:
+- |
+  ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDB09q11KKRPQDrioesdIQRst7FLZMmSNUBvS7GCvUapAZ253QMO1+akEletdrFMtnZ53FG+r756hWUG5157Xq3p2RJkM9/vI9MIovTM0SnzP7mHwvrzRThomZ600l4on8Xi/pET47dkV9MxADR/RAKo5cmc3N1/jYhB8v5U18AfDGYKBpqvp2yyIOX0Ems8ULFzNAnUXWqFWS2sQxZmVp69Y18gxYZ9iqtxEK8vGjLKkJpPnkyceqmVfydgoTCAHdpgmALgjtSmUsrvpCugpJ/1G/gAR6JOoxM75yf3/1lji/cWlUyeQZfa9E+yj6R8Cd3pd9BjwC14l7qjhP+JBkh tomas.korcak@gooddata.com
+- |
+  ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCYRbc5RBP3S+4/2mhN7LHZssHUti8LfbouolrdNxf8FC4SN+C0GrBFZNoXr35aaB2G4gnWVkSvAdKVN0hlJqE5Yoq929SchQD/Mpnkx2o2EaR81cpqHFX3kWeEvuE2sybx8qPcOaQaiJFCyMGkCyj34RFK9csfodS0Gvikaxg4ia2ofB6A6txLA6e0Bznq9piz5sDnF6zkJUBjQD8JbPcwGPms+Nw4ckkPVOINgg+vGeu4DSlqSUTE8wSMWG+hdW3XDeXF1/QtSteOMgopaukGFy4fHQUg69q0NjHnXsNJ/+EM6D84gcqrGXUXFdqH29Ltvn0puPTOJ2OHI2CI6T1ehCBt2SBwWFh+G88zR9eFib6HTHHYQzKfslou8toUmK/3Xz30Bl5AUcCt1TN80CHa4RtScjP1AjbvEAWY56/jm5UtZm0j1fQBmmYRe4wuSYzldC7QcjbSTshFOLhqzhfaBXh5bXKR1izoBrkCQ1tSv/45TIKrRI+m4/7OmBfZwU/0dqUzaGF9bokvWZxf31UU07NvmDHzAMOveuCfx+oRs7VGyh3ka5tUVoCZJbP1IwWya72vu+uXeN5zOzmvyh+55tkB3lrJqm/kr7pQqvlYu8vUVPbI8wbZzYMBNDsp41Hw8nHEmUrzmYhqEQnNPmn+LFwkPxTkJNig/GRzyS83Hw== korczis@gmail.com
+- path: /etc/environment
+  content: |
+    COREOS_PUBLIC_IPV4=$public_ipv4
+    COREOS_PRIVATE_IPV4=$private_ipv4
+    COREOS_PUBLIC_IPV6=$public_ipv6
+    COREOS_PRIVATE_IPV6=$private_ipv6
