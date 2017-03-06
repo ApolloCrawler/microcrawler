@@ -1,1 +1,4 @@
 /controller-install.sh
+/certs/*.csr
+/certs/*.pem
+/*.srl
