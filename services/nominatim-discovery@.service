@@ -1,0 +1,12 @@
+[Unit]
+Description=Announce Nominatim Instance @%i service
+BindsTo=nominatim@%i.service
+
+[Service]
+EnvironmentFile=/etc/environment
+
+ExecStart=/bin/sh -c "while true; do etcdctl set /discovery/services/nominatim@%i ${COREOS_PRIVATE_IPV4}:8081 --ttl 60; sleep 45; done"
+ExecStop=/usr/bin/etcdctl rm /discovery/services/nominatim%i
+
+[X-Fleet]
+X-ConditionMachineOf=nominatim@%i.service

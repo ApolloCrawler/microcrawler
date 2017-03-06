@@ -1,0 +1,20 @@
+[Unit]
+Description=Nominatim
+After=docker.service
+Requires=docker.service
+
+After=couchbase@%i.service
+
+[Service]
+EnvironmentFile=/etc/environment
+
+TimeoutStartSec=0
+ExecStartPre=-/usr/bin/docker kill nominatim
+ExecStartPre=-/usr/bin/docker rm nominatim
+ExecStartPre=/usr/bin/docker pull korczis/nominatim
+ExecStart=/usr/bin/docker run --name nominatim -p 5432:5432 -p 8081:8080 korczis/gauc
+ExecStop=/usr/bin/docker stop nominatim
+
+[X-Fleet]
+# Don't schedule on the same machine as other Nominatim instances
+X-Conflicts=nominatim@*.service
