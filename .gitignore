@@ -2,3 +2,6 @@
 /certs/*.csr
 /certs/*.pem
 /*.srl
+/scripts/kube-aws-darwin-amd64
+/scripts/kube-aws-linux-amd64
+/scripts/*.tar.gz

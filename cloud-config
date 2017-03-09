@@ -1,18 +1,45 @@
 #cloud-config
 coreos:
   update:
-    reboot-strategy: best-effort
+    reboot-strategy: off
   etcd2:
     advertise-client-urls: http://$private_ipv4:2379,http://$private_ipv4:4001
     initial-advertise-peer-urls: http://$private_ipv4:2380
     listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
     listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
-    discovery: https://discovery.etcd.io/0fc97b3ffdc2f615108722c1c1b8fa68
+    discovery: https://discovery.etcd.io/2d6b532d5cd75fa961607fbac182d940
+  flannel:
+    ip_masq: true
+    interface: eth0
+  fleet:
+    public-ip: "$public_ipv4"
+    private-ip: "$private_ipv4"
+    metadata: private-ip=$private_ipv4,public-ip=$public_ipv4,kubernetes_role=master
   units:
   - name: etcd2.service
     command: start
   - name: fleet.service
     command: start
+  - name: flanneld.service
+    drop-ins:
+      - name: 50-flannel.conf
+        content: |
+          [Unit]
+          Requires=etcd2.service
+          After=etcd2.service
+          [Service]
+          ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+    command: start
+  - name: generate-serviceaccount-key.service
+    command: start
+    content: |
+      [Unit]
+      Description=Generate service-account key file
+      [Service]
+      ExecStartPre=-/usr/bin/mkdir -p /var/run/kubernetes/
+      ExecStart=/bin/openssl genrsa -out /var/run/kubernetes/kube-serviceaccount.key 2048 2>/dev/null
+      RemainAfterExit=yes
+      Type=oneshot
   - name: docker.service
     drop-ins:
     - name: 30-increase-ulimit.conf
@@ -20,25 +47,181 @@ coreos:
         [Service]
         LimitMEMLOCK=infinity
       command: restart
+    - name: 51-docker-mirror.conf
+      content: |
+        [Unit]
+        # making sure that flanneld finished startup, otherwise containers
+        # won't land in flannel's network...
+        Requires=flanneld.service
+        After=flanneld.service
+        Restart=Always
+  - name: download-release.service
+    command: start
+    content: |
+      [Unit]
+      Description=Downloads Kubernetes Release
+      After=network-online.target
+      Requires=network-online.target
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/bin/bash /opt/bin/download-release.sh
+  - name: kube-apiserver.service
+    command: start
+    content: |
+      [Unit]
+      Description=Kubernetes API Server
+      Documentation=https://github.com/kubernetes/kubernetes
+      After=network-online.target
+      Requires=network-online.target
+      After=download-release.service
+      Requires=download-release.service
+      Requires=generate-serviceaccount-key.service
+      After=generate-serviceaccount-key.service
+      [Service]
+      ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-apiserver /opt/bin/kube-apiserver
+      ExecStartPre=/usr/bin/mkdir -p /var/lib/kube-apiserver
+      ExecStart=/opt/bin/kube-apiserver \
+      --address=127.0.0.1 \
+      --cloud-provider=rackspace \
+      --cloud-config=/etc/cloud.conf \
+      --etcd-servers=http://127.0.0.1:4001 \
+      --logtostderr=true \
+      --port=8080 \
+      --service-cluster-ip-range=SERVICE_CLUSTER_IP_RANGE \
+      --token-auth-file=/var/lib/kube-apiserver/known_tokens.csv \
+      --v=2 \
+      --service-account-key-file=/var/run/kubernetes/kube-serviceaccount.key \
+      --service-account-lookup=false \
+      --admission-control=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota,DefaultTolerationSeconds
+      Restart=always
+      RestartSec=5
+  - name: apiserver-advertiser.service
+    command: start
+    content: |
+      [Unit]
+      Description=Kubernetes Apiserver Advertiser
+      After=etcd2.service
+      Requires=etcd2.service
+      After=master-apiserver.service
+      [Service]
+      ExecStart=/bin/sh -c 'etcdctl set /corekube/apiservers/$public_ipv4 $public_ipv4'
+      Restart=always
+      RestartSec=120
+  - name: kube-controller-manager.service
+    command: start
+    content: |
+      [Unit]
+      Description=Kubernetes Controller Manager
+      Documentation=https://github.com/kubernetes/kubernetes
+      After=network-online.target
+      Requires=network-online.target
+      After=kube-apiserver.service
+      Requires=kube-apiserver.service
+      [Service]
+      ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-controller-manager /opt/bin/kube-controller-manager
+      ExecStart=/opt/bin/kube-controller-manager \
+      --cloud-provider=rackspace \
+      --cloud-config=/etc/cloud.conf \
+      --logtostderr=true \
+      --master=127.0.0.1:8080 \
+      --v=2 \
+      --service-account-private-key-file=/var/run/kubernetes/kube-serviceaccount.key \
+      --root-ca-file=/run/kubernetes/apiserver.crt
+      Restart=always
+      RestartSec=5
+  - name: kube-scheduler.service
+    command: start
+    content: |
+      [Unit]
+      Description=Kubernetes Scheduler
+      Documentation=https://github.com/kubernetes/kubernetes
+      After=network-online.target
+      Requires=network-online.target
+      After=kube-apiserver.service
+      Requires=kube-apiserver.service
+      [Service]
+      ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-scheduler /opt/bin/kube-scheduler
+      ExecStart=/opt/bin/kube-scheduler \
+      --logtostderr=true \
+      --master=127.0.0.1:8080
+      Restart=always
+      RestartSec=5
+  #Running nginx service with --net="host" is a necessary evil until running all k8s services in docker.
+  - name: kubernetes-nginx.service
+    command: start
+    content: |
+      [Unit]
+      Description=Kubernetes Nginx Service
+      After=network-online.target
+      Requires=network-online.target
+      After=docker.service
+      Requires=docker.service
+      [Service]
+      ExecStartPre=/opt/bin/git-kubernetes-nginx.sh
+      ExecStartPre=-/usr/bin/docker rm kubernetes_nginx
+      ExecStart=/usr/bin/docker run --rm --net="host" -p "443:443" -t --name "kubernetes_nginx" kubernetes_nginx
+      ExecStop=/usr/bin/docker stop kubernetes_nginx
+      Restart=always
+      RestartSec=15
 ssh_authorized_keys:
 - |
   ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDB09q11KKRPQDrioesdIQRst7FLZMmSNUBvS7GCvUapAZ253QMO1+akEletdrFMtnZ53FG+r756hWUG5157Xq3p2RJkM9/vI9MIovTM0SnzP7mHwvrzRThomZ600l4on8Xi/pET47dkV9MxADR/RAKo5cmc3N1/jYhB8v5U18AfDGYKBpqvp2yyIOX0Ems8ULFzNAnUXWqFWS2sQxZmVp69Y18gxYZ9iqtxEK8vGjLKkJpPnkyceqmVfydgoTCAHdpgmALgjtSmUsrvpCugpJ/1G/gAR6JOoxM75yf3/1lji/cWlUyeQZfa9E+yj6R8Cd3pd9BjwC14l7qjhP+JBkh tomas.korcak@gooddata.com
 - |
   ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCYRbc5RBP3S+4/2mhN7LHZssHUti8LfbouolrdNxf8FC4SN+C0GrBFZNoXr35aaB2G4gnWVkSvAdKVN0hlJqE5Yoq929SchQD/Mpnkx2o2EaR81cpqHFX3kWeEvuE2sybx8qPcOaQaiJFCyMGkCyj34RFK9csfodS0Gvikaxg4ia2ofB6A6txLA6e0Bznq9piz5sDnF6zkJUBjQD8JbPcwGPms+Nw4ckkPVOINgg+vGeu4DSlqSUTE8wSMWG+hdW3XDeXF1/QtSteOMgopaukGFy4fHQUg69q0NjHnXsNJ/+EM6D84gcqrGXUXFdqH29Ltvn0puPTOJ2OHI2CI6T1ehCBt2SBwWFh+G88zR9eFib6HTHHYQzKfslou8toUmK/3Xz30Bl5AUcCt1TN80CHa4RtScjP1AjbvEAWY56/jm5UtZm0j1fQBmmYRe4wuSYzldC7QcjbSTshFOLhqzhfaBXh5bXKR1izoBrkCQ1tSv/45TIKrRI+m4/7OmBfZwU/0dqUzaGF9bokvWZxf31UU07NvmDHzAMOveuCfx+oRs7VGyh3ka5tUVoCZJbP1IwWya72vu+uXeN5zOzmvyh+55tkB3lrJqm/kr7pQqvlYu8vUVPbI8wbZzYMBNDsp41Hw8nHEmUrzmYhqEQnNPmn+LFwkPxTkJNig/GRzyS83Hw== korczis@gmail.com
 write_files:
-- path: /etc/environment
-  content: |
-    COREOS_PUBLIC_IPV4=$public_ipv4
-    COREOS_PRIVATE_IPV4=$private_ipv4
-    COREOS_PUBLIC_IPV6=$public_ipv6
-    COREOS_PRIVATE_IPV6=$private_ipv6
-- path: "/home/core/init.sh"
-  owner: core
-  permissions: '0755'
-  content: |
-    #! /usr/bin/sh
-    echo -e "Host github.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-    git clone https://github.com/ApolloCrawler/microcrawler.git
-    cd microcrawler
-    git checkout kubernetes
-    cd ..
+  - path: /etc/environment
+    content: |
+      COREOS_PUBLIC_IPV4=$public_ipv4
+      COREOS_PRIVATE_IPV4=$private_ipv4
+      COREOS_PUBLIC_IPV6=$public_ipv6
+      COREOS_PRIVATE_IPV6=$private_ipv6
+  - path: "/home/core/init.sh"
+    owner: core
+    permissions: '0755'
+    content: |
+      #! /usr/bin/sh
+      echo -e "Host github.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+      git clone https://github.com/ApolloCrawler/microcrawler.git
+      cd microcrawler
+      git checkout kubernetes
+      cd ..
+  - path: /etc/cloud.conf
+    permissions: 0600
+    content: |
+      [Global]
+      auth-url = OS_AUTH_URL
+      username = OS_USERNAME
+      api-key = OS_PASSWORD
+      tenant-id = OS_TENANT_NAME
+      region = OS_REGION_NAME
+      [LoadBalancer]
+      subnet-id = 11111111-1111-1111-1111-111111111111
+  - path: /opt/bin/git-kubernetes-nginx.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash
+      git clone https://github.com/thommay/kubernetes_nginx /opt/kubernetes_nginx
+      /usr/bin/cp /opt/.kubernetes_auth /opt/kubernetes_nginx/.kubernetes_auth
+      /opt/kubernetes_nginx/git-kubernetes-nginx.sh
+  - path: /opt/bin/download-release.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash
+      # This temp URL is only good for the length of time specified at cluster creation time.
+      # Afterward, it will result in a 403.
+      OBJECT_URL="CLOUD_FILES_URL"
+      if [ ! -s /opt/kubernetes.tar.gz ]
+      then
+        echo "Downloading release ($OBJECT_URL)"
+        wget "${OBJECT_URL}" -O /opt/kubernetes.tar.gz
+        echo "Unpacking release"
+        rm -rf /opt/kubernetes || false
+        tar xzf /opt/kubernetes.tar.gz -C /opt/
+      else
+        echo "kubernetes release found. Skipping download."
+      fi
+  - path: /opt/.kubernetes_auth
+    permissions: 0600
+    content: |
+      KUBE_USER:KUBE_PASSWORD

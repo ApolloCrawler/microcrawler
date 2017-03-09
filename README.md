@@ -17,7 +17,7 @@ $ cd microcrawler
 ### Init submodules
 
 ```
-$ git submodule init
+$ git pull && git submodule init && git submodule update && git submodule status
 ```
 
 ## How To
@@ -31,4 +31,5 @@ $ git submodule init
 
 ## Note
 
+See [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes/tree/master/cluster)
 See [coreos/coreos-kubernetes](https://github.com/coreos/coreos-kubernetes)
